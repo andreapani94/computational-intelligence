@@ -32,8 +32,6 @@ class SetCoveringProblem:
         #since action is a list, the cost is defined as the length of the list
         return len(action)
 
-               
-
 def problem(N, seed = None):
     random.seed(seed)
     return [
@@ -41,39 +39,24 @@ def problem(N, seed = None):
         for n in range(random.randint(N, N * 5))
     ]
 
-def greedy(N):
-    goal = set(range(N))
-    covered = set()
-    solution = list()
-    all_lists = sorted(problem(N, seed = 42), key = lambda l: len(l))
-    #print('The problem is:')
-    #print(all_lists)
-    while goal != covered:
-        l = all_lists.pop(0)
-        if not set(l) < covered:
-            solution.append(l)
-            covered |= set(l)
-    #print('The solution is:')
-    #print(solution)
-    w = sum(len(l) for l in solution)
-    print('w = ' + str(w))
-
-def best_first_search(problem: SetCoveringProblem):
+def solution(problem: SetCoveringProblem):
     starting_node = Node(problem.initial_state)
     #simulate priority queue with an ordered list
     frontier = list()
     frontier.append(starting_node)
     reached = dict()
-    reached[frozenset(problem.initial_state)] = starting_node 
+    reached[str(problem.initial_state)] = starting_node 
+    node_counter = 0
     while len(frontier) > 0:
         node: Node = frontier.pop(0)
+        node_counter += 1
         #check if node is goal state
         if problem.is_goal(node.state):
-            return node
+            return node, node_counter
         for child in expand(problem, node):
-            state = frozenset(child.state)
+            state = str(child.state)
             if state not in reached or child.path_cost < reached[state].path_cost:
-                reached[state] = node
+                reached[state] = child
                 frontier.append(child)
         #to simulate a priority queue
         frontier.sort(key = lambda node: node.path_cost)
@@ -85,22 +68,30 @@ def expand(problem: SetCoveringProblem, node: Node):
     for action in problem.actions(state):
         result_state = problem.result(state,action)
         total_cost = node.path_cost + problem.action_cost(action)
-        expanded_node = Node(result_state, node, action, total_cost)
+        #sum the heuristic estimation to the goal
+        goal_estimation = len(problem.goal_state - (state | result_state))
+        expanded_node = Node(result_state, node, action, total_cost + goal_estimation)
         expanded_nodes.append(expanded_node)
     return expanded_nodes
 
-def print_path(node: Node):
+def print_metrics(node: Node, N, node_count):
     path = []
-    while node.parent != None:
+    while True:
         path.append(node)
         node = node.parent
+        if node.parent == None:
+            break
     path.reverse()
-    for node  in path:
-        print(node)
-
-
+    w = 0
+    for node in path:
+        w += len(node.action)
+    bloat = (w - N) / N * 100
+    print('w = ' + str(w))
+    print("bloat = %.0f%%" % bloat)
+    print('Number of visited nodes: %d' % node_count)
 
 if __name__ == '__main__':
-    problem = SetCoveringProblem(100)
-    goal = best_first_search(problem)
-    print_path(goal)
+    N = 20
+    problem = SetCoveringProblem(N)
+    goal, node_count = solution(problem)
+    print_metrics(goal, N, node_count)
